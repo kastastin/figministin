@@ -11,9 +11,11 @@ import {
 	handleCanvasMouseDown,
 	handleCanvaseMouseMove,
 	handleCanvasObjectModified,
+	handleCanvasSelectionCreated,
+	handleCanvasObjectScaling,
 } from '@/lib/canvas';
 
-import { ActiveElement } from '@/types/type';
+import { ActiveElement, Attributes } from '@/types/type';
 import { defaultNavElement } from '@/constants';
 import { useStorage, useMutation, useUndo, useRedo } from '@/liveblocks.config';
 import { handleDelete, handleKeyDown } from '@/lib/key-events';
@@ -34,9 +36,20 @@ export default function Page() {
 	const activeObjectRef = useRef<fabric.Object | null>(null);
 	const selectedShapeRef = useRef<string | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
+	const isEditingRef = useRef(false);
 	const isDrawing = useRef(false);
 
 	const canvasObjects = useStorage((root) => root.canvasObjects);
+
+	const [elementAttributes, setElementAttributes] = useState<Attributes>({
+		width: '',
+		height: '',
+		fontSize: '',
+		fontFamily: '',
+		fontWeight: '',
+		fill: '#aabbcc',
+		stroke: '#aabbcc',
+	});
 
 	const syncShapeInStorage = useMutation(({ storage }, object) => {
 		if (!object) return;
@@ -146,6 +159,21 @@ export default function Page() {
 			});
 		});
 
+		canvas.on('selection:created', (options: any) => {
+			handleCanvasSelectionCreated({
+				options,
+				isEditingRef,
+				setElementAttributes,
+			});
+		});
+
+		canvas.on('object:scaling', (options) => {
+			handleCanvasObjectScaling({
+				options,
+				setElementAttributes,
+			});
+		});
+
 		window.addEventListener('resize', () => {
 			handleResize({ fabricRef } as any);
 		});
@@ -195,10 +223,15 @@ export default function Page() {
 			<section className='h-full flex flex-row'>
 				<LeftSidebar allShapes={Array.from(canvasObjects)} />
 				<Live canvasRef={canvasRef} />
-				<RightSidebar />
+				<RightSidebar
+					elementAttributes={elementAttributes}
+					setElementAttributes={setElementAttributes}
+					fabricRef={fabricRef}
+					isEditingRef={isEditingRef}
+					activeObjectRef={activeObjectRef}
+					syncShapeInStorage={syncShapeInStorage}
+				/>
 			</section>
 		</main>
 	);
 }
-
-// history list order of all added elements
