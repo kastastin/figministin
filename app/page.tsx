@@ -15,8 +15,8 @@ import {
 
 import { ActiveElement } from '@/types/type';
 import { defaultNavElement } from '@/constants';
-import { useStorage, useMutation } from '@/liveblocks.config';
-import { handleDelete } from '@/lib/key-events';
+import { useStorage, useMutation, useUndo, useRedo } from '@/liveblocks.config';
+import { handleDelete, handleKeyDown } from '@/lib/key-events';
 
 import Navbar from '@/components/Navbar';
 import Live from '@/components/Live';
@@ -24,11 +24,14 @@ import LeftSidebar from '@/components/LeftSidebar';
 import RightSidebar from '@/components/RightSidebar';
 
 export default function Page() {
+	const undo = useUndo();
+	const redo = useRedo();
+
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const fabricRef = useRef<fabric.Canvas | null>(null);
 	const shapeRef = useRef<fabric.Object | null>(null);
 	const activeObjectRef = useRef<fabric.Object | null>(null);
-	const selectedShapeRef = useRef<string | null>('rectangle');
+	const selectedShapeRef = useRef<string | null>(null);
 	const isDrawing = useRef(false);
 
 	const canvasObjects = useStorage((root) => root.canvasObjects);
@@ -94,7 +97,7 @@ export default function Page() {
 	useEffect(() => {
 		const canvas = initializeFabric({ canvasRef, fabricRef });
 
-		canvas.on('mouse:down', (options) => {
+		canvas.on('mouse:down', (options: any) => {
 			handleCanvasMouseDown({
 				canvas,
 				options,
@@ -104,7 +107,7 @@ export default function Page() {
 			});
 		});
 
-		canvas.on('mouse:move', (options) => {
+		canvas.on('mouse:move', (options: any) => {
 			handleCanvaseMouseMove({
 				canvas,
 				options,
@@ -115,7 +118,7 @@ export default function Page() {
 			});
 		});
 
-		canvas.on('mouse:up', (options) => {
+		canvas.on('mouse:up', () => {
 			handleCanvasMouseUp({
 				canvas,
 				shapeRef,
@@ -127,7 +130,7 @@ export default function Page() {
 			});
 		});
 
-		canvas.on('object:modified', (options) => {
+		canvas.on('object:modified', (options: any) => {
 			handleCanvasObjectModified({
 				options,
 				syncShapeInStorage,
@@ -136,6 +139,17 @@ export default function Page() {
 
 		window.addEventListener('resize', () => {
 			handleResize({ fabricRef } as any);
+		});
+
+		window.addEventListener('keydown', (e: any) => {
+			handleKeyDown({
+				e,
+				canvas: fabricRef.current,
+				undo,
+				redo,
+				syncShapeInStorage,
+				deleteShapeFromStorage,
+			});
 		});
 
 		return () => {
@@ -159,10 +173,12 @@ export default function Page() {
 			/>
 
 			<section className='h-full flex flex-row'>
-				<LeftSidebar />
+				<LeftSidebar allShapes={Array.from(canvasObjects)} />
 				<Live canvasRef={canvasRef} />
 				<RightSidebar />
 			</section>
 		</main>
 	);
 }
+
+// history list order of all added elements
